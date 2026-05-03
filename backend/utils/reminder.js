@@ -35,7 +35,7 @@ export async function generateOccasionMessage({ age, event_type, relation }) {
         },
         body: JSON.stringify({
           // 3. Replaced with a valid, fast Groq model.
-          model: "llama3-8b-8192",
+          model: "openai/gpt-oss-120b",
           messages,
           temperature: 0.7, // Adds slight creativity/warmth
           max_tokens: 150, // Prevents the AI from rambling

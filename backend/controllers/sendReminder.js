@@ -1,13 +1,14 @@
 import userModal from "../models/userModel.js";
-import { generateOccasionMessage } from "../utils/reminder.js";
 import axios from "axios";
+import { generateOccasionMessage } from "../utils/reminder.js";
 
-const festival = [
-  // Diwali
-  "https://res.cloudinary.com/detirn2nl/image/upload/v1753525261/xdiljj8fcuzcqeql3nvi.png",
-  // Rakshabandhan
-  "https://res.cloudinary.com/detirn2nl/image/upload/v1753525260/j0jf0ad3wd98pxzt94qr.png",
-];
+const safe = (val) => {
+  if (!val) return "N/A";
+  const str = String(val)
+    .trim()
+    .replace(/[^\x00-\x7F]/g, ""); // Remove all emojis/non-ASCII
+  return str.length > 0 ? str : "N/A";
+};
 
 const birthday = [
   "https://res.cloudinary.com/detirn2nl/image/upload/v1753525166/byst9enfypgr4uhkjkbm.png",
@@ -25,15 +26,18 @@ const anniversary = [
   "https://res.cloudinary.com/detirn2nl/image/upload/v1753525166/yzf2qqnffw9ei0bzxkn0.png",
 ];
 
-function getYearsSince(dateString) {
-  const today = new Date();
-  const date = new Date(dateString);
-  let years = today.getFullYear() - date.getFullYear();
-  const beforeAnniversary =
-    today.getMonth() < date.getMonth() ||
-    (today.getMonth() === date.getMonth() && today.getDate() < date.getDate());
-  if (beforeAnniversary) years--;
-  return years;
+const festival = [
+  "https://res.cloudinary.com/detirn2nl/image/upload/v1753525261/xdiljj8fcuzcqeql3nvi.png",
+  "https://res.cloudinary.com/detirn2nl/image/upload/v1753525260/j0jf0ad3wd98pxzt94qr.png",
+];
+
+function getImageForEvent(eventType) {
+  const type = (eventType || "").toLowerCase();
+  let arr;
+  if (type.includes("birthday")) arr = birthday;
+  else if (type.includes("anniversary")) arr = anniversary;
+  else arr = festival;
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 export async function checkAndSendMessages() {
@@ -50,91 +54,85 @@ export async function checkAndSendMessages() {
         eventDate.getDate() === today.getDate() &&
         eventDate.getMonth() === today.getMonth()
       ) {
-        const age = getYearsSince(ev.date);
-        const recipient_name = ev.name;
-        const event_type = ev.event;
-        const custom_message = await generateOccasionMessage({
-          age,
-          event_type,
+        console.log("📋 Processing event:", {
+          name: ev.name,
+          event: ev.event,
+          phone: ev.phone,
           relation: ev.relation,
+          sender: sender_name,
         });
 
-        let imageUrl =
-          "https://res.cloudinary.com/detirn2nl/image/upload/v1753525261/xdiljj8fcuzcqeql3nvi.png";
-        if (event_type === "Birthday") {
-          const randomIndex = Math.floor(Math.random() * birthday.length);
-          imageUrl = birthday[randomIndex];
-        } else if (event_type === "Festival") {
-          const randomIndex = Math.floor(Math.random() * festival.length);
-          imageUrl = festival[randomIndex];
-        } else if (event_type === "Anniversary") {
-          const randomIndex = Math.floor(Math.random() * anniversary.length);
-          imageUrl = anniversary[randomIndex];
+        let custom_message;
+        try {
+          custom_message = await generateOccasionMessage({
+            age: 0,
+            event_type: ev.event,
+            relation: ev.relation || "friend",
+          });
+          // Strip emojis from AI response
+          custom_message = custom_message.replace(/[^\x00-\x7F]/g, "").trim();
+          console.log("✅ Generated message:", custom_message);
+        } catch (err) {
+          console.log("⚠️ Groq failed, using fallback:", err.message);
+          // No emoji in fallback!
+          custom_message = `Wishing you a very happy ${ev.event}. May this day bring you lots of joy and happiness.`;
         }
 
+        const imageUrl = getImageForEvent(ev.event);
+
+        const params = {
+          recipient_name: safe(ev.name),
+          event_type: safe(ev.event),
+          custom_message: safe(custom_message),
+          sender_name: safe(sender_name),
+        };
+        console.log("📤 Parameters being sent:", params);
+
         try {
-          const response = await axios({
-            url: `https://graph.facebook.com/v22.0/${process.env.WHATSAPP_APP_ID}/messages`,
-            method: "post",
-            headers: {
-              Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-            data: {
+          const response = await axios.post(
+            `https://graph.facebook.com/v22.0/${process.env.PHONE_NUMBER_ID}/messages`,
+            {
               messaging_product: "whatsapp",
               to: `91${ev.phone}`,
               type: "template",
               template: {
                 name: "event_reminder",
-                language: {
-                  code: "en",
-                },
+                language: { code: "en" },
                 components: [
                   {
                     type: "header",
                     parameters: [
                       {
                         type: "image",
-                        image: {
-                          link: imageUrl,
-                        },
+                        image: { link: imageUrl },
                       },
                     ],
                   },
                   {
                     type: "body",
                     parameters: [
-                      {
-                        type: "text",
-                        parameter_name: "recipient_name",
-                        text: recipient_name,
-                      },
-                      {
-                        type: "text",
-                        parameter_name: "event_type",
-                        text: event_type,
-                      },
-                      {
-                        type: "text",
-                        parameter_name: "custom_message",
-                        text: custom_message,
-                      },
-                      {
-                        type: "text",
-                        parameter_name: "sender_name",
-                        text: sender_name,
-                      },
+                      { type: "text", text: params.recipient_name },
+                      { type: "text", text: params.event_type },
+                      { type: "text", text: params.custom_message },
+                      { type: "text", text: params.sender_name },
                     ],
                   },
                 ],
               },
             },
-          });
-          console.log(response.data);
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          console.log("✅ Message sent to", ev.phone, ":", response.data);
         } catch (error) {
           console.error(
-            "WhatsApp API Error:",
-            error.response?.data || error.message,
+            `❌ WhatsApp API Error for ${ev.phone}:`,
+            error.response?.data || error.message
           );
         }
       }

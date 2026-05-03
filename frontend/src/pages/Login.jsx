@@ -1,167 +1,174 @@
-import { useState, useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import AppContext from "../context/AppContext";
 
 const Login = () => {
-  // Use a boolean for toggle state (faster and less error-prone than string matching)
-  const [isLogin, setIsLogin] = useState(true);
+  const [currentState, setCurrentState] = useState("Login");
 
-  // Consolidate form state into a single object to reduce multiple useState hooks
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    password: "",
-  });
+  const { token, setToken, navigate, backendUrl } = useContext(AppContext);
 
-  // Add a loading state to prevent multiple submissions
-  const [isLoading, setIsLoading] = useState(false);
-
-  const { setToken, backendUrl } = useContext(AppContext);
-
-  // Generic change handler for all inputs
-  const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const onSubmitHandler = async (event) => {
     event.preventDefault();
-    if (isLoading) return; // Prevent double clicks
 
-    setIsLoading(true);
     try {
-      // Dynamically set endpoint and payload based on the current state
-      const endpoint = isLogin ? "/user/login" : "/user/register";
-      const payload = isLogin
-        ? { email: formData.email, password: formData.password }
-        : formData;
+      setLoading(true)
+      if (currentState === "Sign Up") {
+        if (password !== confirmPassword) {
+          return toast.error("Passwords do not match");
+        }
 
-      const response = await axios.post(`${backendUrl}${endpoint}`, payload);
+        const response = await axios.post(
+          backendUrl + "/user/register",
+          {
+            name,
+            phone,
+            email,
+            password,
+          }
+        );
 
-      if (response.data.success) {
-        setToken(response.data.token);
-        localStorage.setItem("token", response.data.token);
-        toast.success(isLogin ? "Logged in successfully!" : "Account created!");
+        if (response.data.success) {
+          setToken(response.data.token);
+          localStorage.setItem("token", response.data.token);
+        } else {
+          toast.error(response.data.message);
+        }
       } else {
-        toast.error(response.data.message);
+        const response = await axios.post(
+          backendUrl + "/user/login",
+          {
+            email,
+            password,
+          }
+        );
+
+        if (response.data.success) {
+          setToken(response.data.token);
+          localStorage.setItem("token", response.data.token);
+        } else {
+          toast.error(response.data.message);
+        }
       }
     } catch (error) {
-      console.error("Authentication error:", error);
-      // Fallback to axios specific error message if available
-      toast.error(
-        error.response?.data?.message || "An error occurred. Please try again.",
-      );
+      console.log(error);
+      toast.error(error.response?.data?.message || error.message);
     } finally {
-      setIsLoading(false);
+      setLoading(false)
     }
   };
 
+  useEffect(() => {
+    if (token) {
+      navigate("/");
+    }
+  }, [token]);
+
   return (
-    <div className="border md:w-[40%] bg-gray-50 mx-auto shadow-2xl border-gray-300 rounded-2xl p-4">
-      <p className="text-2xl font-medium text-center my-4">
-        Welcome to Humanastic
-      </p>
-      <form onSubmit={onSubmitHandler} className="flex flex-col gap-3">
-        {/* Render Name and Phone only if signing up */}
-        {!isLogin && (
-          <>
-            <div className="flex flex-col">
-              <label className="font-medium" htmlFor="name">
-                Name
-              </label>
-              <input
-                onChange={handleChange}
-                value={formData.name}
-                className="py-2 px-4 rounded bg-gray-200"
-                type="text"
-                name="name"
-                id="name"
-                placeholder="Enter your Name"
-                required
-              />
-            </div>
-            <div className="flex flex-col">
-              <label className="font-medium" htmlFor="phone">
-                Phone
-              </label>
-              <input
-                onChange={handleChange}
-                value={formData.phone}
-                className="py-2 px-4 rounded bg-gray-200"
-                type="tel"
-                name="phone"
-                id="phone"
-                placeholder="Enter your Phone Number"
-                required
-              />
-            </div>
-          </>
+    <form
+      onSubmit={onSubmitHandler}
+      className="flex flex-col items-center w-[90%] border px-15 pb-5 rounded-2xl sm:max-w-96 m-auto mt-14 gap-4 text-gray-800"
+    >
+      <div className="inline-flex items-center gap-2 mt-10">
+        <p className="text-3xl">{currentState}</p>
+        <hr className="h-[1.5px] w-8 bg-gray-800" />
+      </div>
+
+      {/* Name */}
+      {currentState !== "Login" && (
+        <input
+          onChange={(e) => setName(e.target.value)}
+          value={name}
+          className="w-full px-3 py-2 border"
+          type="text"
+          placeholder="Name"
+          required
+        />
+      )}
+
+      {/* Phone */}
+      {currentState !== "Login" && (
+        <input
+          onChange={(e) => setPhone(e.target.value)}
+          value={phone}
+          className="w-full px-3 py-2 border"
+          type="text"
+          placeholder="Phone"
+          required
+        />
+      )}
+
+      {/* Email */}
+      <input
+        onChange={(e) => setEmail(e.target.value)}
+        value={email}
+        className="w-full px-3 py-2 border"
+        type="email"
+        placeholder="Email"
+        required
+      />
+
+      {/* Password */}
+      <input
+        onChange={(e) => setPassword(e.target.value)}
+        value={password}
+        className="w-full px-3 py-2 border"
+        type="password"
+        placeholder="Password"
+        required
+      />
+
+      {/* Confirm Password */}
+      {currentState !== "Login" && (
+        <input
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          value={confirmPassword}
+          className="w-full px-3 py-2 border"
+          type="password"
+          placeholder="Confirm Password"
+          required
+        />
+      )}
+
+      <div className="w-full flex justify-between text-sm">
+        {currentState === "Login" && (
+          <p
+            onClick={() => navigate("/reset-password")}
+            className="cursor-pointer text-blue-600"
+          >
+            Forgot password?
+          </p>
         )}
 
-        <div className="flex flex-col">
-          <label className="font-medium" htmlFor="email">
-            Email
-          </label>
-          <input
-            onChange={handleChange}
-            value={formData.email}
-            className="py-2 px-4 rounded bg-gray-200"
-            type="email"
-            name="email"
-            id="email"
-            placeholder="Enter your Email"
-            required
-          />
-        </div>
-
-        <div className="flex flex-col">
-          <label className="font-medium" htmlFor="password">
-            Password
-          </label>
-          <input
-            onChange={handleChange}
-            value={formData.password}
-            className="py-2 px-4 rounded bg-gray-200"
-            type="password"
-            name="password"
-            id="password"
-            placeholder="Enter your Password"
-            required
-          />
-        </div>
-
-        <div className="mb-4 mt-2">
-          <button
-            disabled={isLoading}
-            className={`py-2 rounded-full w-full font-medium transition-colors ${
-              isLoading
-                ? "bg-gray-400 text-gray-700 cursor-not-allowed"
-                : "bg-green-800 text-gray-100 hover:bg-green-900"
-            }`}
+        {currentState === "Login" ? (
+          <p
+            className="cursor-pointer"
+            onClick={() => setCurrentState("Sign Up")}
           >
-            {isLoading ? "Processing..." : isLogin ? "Login" : "Sign Up"}
-          </button>
+            Create Account
+          </p>
+        ) : (
+          <p
+            className="cursor-pointer"
+            onClick={() => setCurrentState("Login")}
+          >
+            Login Here
+          </p>
+        )}
+      </div>
 
-          <div className="flex justify-between mt-2 text-sm">
-            {isLogin ? (
-              <p className="cursor-pointer text-blue-700 hover:text-blue-500 hover:underline">
-                Forgot Password?
-              </p>
-            ) : (
-              <p></p> // Empty placeholder to keep flex spacing intact
-            )}
-
-            <p
-              onClick={() => setIsLogin(!isLogin)}
-              className="cursor-pointer hover:underline text-gray-700"
-            >
-              {isLogin ? "Create an Account" : "Login Here"}
-            </p>
-          </div>
-        </div>
-      </form>
-    </div>
+      {currentState === "Login" ? 
+          (<button className="bg-black text-white px-8 py-2 rounded-full w-full">{loading ? "loading..." : "Sign In"}</button>) 
+          : 
+          (<button className="bg-black text-white px-8 py-2 rounded-full w-full">{loading ? "loading..." : "Sign In"}</button>)}
+    </form>
   );
 };
 

@@ -17,13 +17,7 @@ app.use(helmet());
 app.use(express.json());
 
 // Secure CORS for production
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "*", // Allows all in dev, but restrict this in production!
-    methods: ["GET", "POST", "PUT", "DELETE"],
-  }),
-);
-
+app.use(cors());
 // --- ROUTES ---
 // Standardized API prefix based on your frontend code
 app.use("/user", userRouter);
@@ -82,7 +76,7 @@ async function startServer() {
 
       // CRITICAL FIX: Added timezone specification
       cron.schedule(
-        "00 5 * * *",
+        "56 13 * * *",
         async () => {
           console.log("Cron job triggered");
           await checkAndSendMessages();

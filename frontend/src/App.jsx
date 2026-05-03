@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Events from "./pages/Events";
 import { ToastContainer } from "react-toastify";
+import ResetPassword from "./pages/ResetPassword";
 
 const App = () => {
   return (
@@ -16,6 +17,7 @@ const App = () => {
         <Route path="/events" element={<Events />} />
         <Route path="/new-event" element={<AddNewEvent />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
       </Routes>
     </div>
   );
